@@ -36,6 +36,8 @@ inline void Register() {
     WiiXLaunch::TotK::Player::Init();
     // GameData: no hooks, only the game's own accessors, checked.
     WiiXLaunch::TotK::GameData::Init();
+    // The world layer: hooks the world manager's own per-frame update.
+    WiiXLaunch::TotK::World::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

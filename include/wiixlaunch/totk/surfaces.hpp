@@ -7,6 +7,7 @@
 #include <wiixlaunch/totk/surfaces/input_surface.hpp>
 #include <wiixlaunch/totk/surfaces/player_surface.hpp>
 #include <wiixlaunch/totk/surfaces/gamedata_surface.hpp>
+#include <wiixlaunch/totk/surfaces/world_surface.hpp>
 
 namespace WiiXLaunch::TotK::Surfaces {
 
@@ -15,6 +16,7 @@ inline void Register() {
     InputSurface::Register();
     PlayerSurface::Register();
     GameDataSurface::Register();
+    WorldSurface::Register();
 }
 
 } // namespace WiiXLaunch::TotK::Surfaces

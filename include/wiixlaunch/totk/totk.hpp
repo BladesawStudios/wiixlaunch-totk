@@ -7,3 +7,4 @@
 #include <wiixlaunch/totk/game/input.hpp>
 #include <wiixlaunch/totk/game/player.hpp>
 #include <wiixlaunch/totk/game/gamedata.hpp>
+#include <wiixlaunch/totk/game/world.hpp>

@@ -15,8 +15,8 @@
 //
 // Only some of the module needs this. The frame source (graphics/present.hpp)
 // and input (game/input.hpp) go through sdk exports and need no address in
-// main on any build; the player layer (game/player.hpp) and the GameData
-// layer (game/gamedata.hpp) do. Fields join Row as features need them, with the 1.2.1 value
+// main on any build; the player (game/player.hpp), GameData
+// (game/gamedata.hpp) and world (game/world.hpp) layers do. Fields join Row as features need them, with the 1.2.1 value
 // first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
@@ -78,11 +78,32 @@ struct GameDataLayout {
     Func getEnum, setEnum;   // an enum value is the murmur3 hash of its name
 };
 
+// World layer (game/world.hpp): game::wm::Module - time of day and weather.
+struct WorldLayout {
+    uint32_t moduleCell;     // GOT cell holding &game::wm::Module::sInstance (WorldInfo::getCurrentWeather: 0x...e148)
+    Func postCalc;           // Module::postCalc_(this, job arg) - per-frame, from WorldMgrSystemPostCalcJob
+    Func worldSetTime;       // World::setTime(world, float seconds, bool advance, s32 day) - one-shot;
+                             //   NOT requestSetTime, whose request flag sticks and pins the clock
+    Func setWeather;         // Module::setWeather(this, s32 weather, bool force) - mutex-guarded;
+                             //   force sets a request flag that sticks until cleared
+    uint32_t moduleWorld;    // Module -> World (Module::setTime: *(this+0x98))
+    uint32_t worldSeconds;   // World -> float seconds of the day (saveCurrentDateTime: ToHours/ToMinutes of it)
+    uint32_t worldDay;       // World -> u32 day count (saveCurrentDateTime: setInt 0xd8d100fa)
+    uint32_t moduleWorldMgr; // Module -> WorldMgr (WorldInfo::getCurrentWeather: *(sInstance+0xd0))
+    uint32_t weatherSlot;    // WorldMgr vtable byte offset of getCurrentWeather (WorldMgrMainField vtable +0x180)
+    uint32_t moduleMutex;    // Module -> nn::os::MutexType guarding the request blocks (setWeather: +0x20)
+    uint32_t requestIndex;   // Module -> u32 index of the block being written (setWeather: +0x2380)
+    uint32_t requestBlocks;  // Module -> first request block; flags u64 at its start (setWeather: +0x940)
+    uint32_t requestStride;  // bytes between the two blocks (setWeather: 0xd20)
+    uint64_t weatherForced;  // the flag setWeather(force) ORs in (0x200000000)
+};
+
 struct Row {
     uint32_t       fingerprint;   // GameVersion::Fingerprint() for this executable
     const char*    name;          // for the log only, never for matching
     PlayerLayout   player;
     GameDataLayout gamedata;
+    WorldLayout    world;
 };
 
 inline constexpr Row kRows[] = {
@@ -105,6 +126,14 @@ inline constexpr Row kRows[] = {
         { 0x00d7d620, 0x34000262u }, { 0x00b964fc, 0xA9BF7BFDu },   // getFloat, setFloat
         { 0x010bcac0, 0x34000262u }, { 0x00decdec, 0xD10083FFu },   // getVector3, setVector3f
         { 0x00d4447c, 0x34000262u }, { 0x00d451b0, 0xA9BF7BFDu },   // getEnum, setEnum
+      },
+      {
+        0x0462e148,
+        { 0x00b36920, 0xD10483FFu },   // postCalc_: sub sp,sp,#0x120
+        { 0x0110f958, 0xA9BD7BFDu },   // World::setTime: stp x29,x30,[sp,#-0x30]!
+        { 0x01e0d604, 0xA9BD7BFDu },   // setWeather: stp x29,x30,[sp,#-0x30]!
+        0x98, 0x28, 0x2c, 0xd0, 0x180,
+        0x20, 0x2380, 0x940, 0xd20, 0x200000000ull,
       } },
 };
 
