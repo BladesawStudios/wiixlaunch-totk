@@ -1,6 +1,7 @@
 #pragma once
 
-// TotK controller input: reading the pad, and hiding it from the game.
+// TotK controller input: reading the pad, hiding it from the game, and
+// pressing buttons the player did not (injection, below the capture code).
 //
 // WHERE IT COMES FROM. TotK's pad poll (1.2.1 decompile) asks nn::hid for the
 // style set of each npad it cares about and then calls the matching overload:
@@ -103,9 +104,106 @@ struct Pad {
     volatile uint32_t buttons;
     volatile float lx, ly, rx, ry;
     volatile uint32_t connected;
+    // Game thread only: which injection this pad has started, and the first
+    // sample it applies to (see Inject).
+    uint32_t injGen;
+    int64_t  injStart;
 };
 inline Pad g_No1{};
 inline Pad g_Handheld{};
+
+// ---- injection ------------------------------------------------------------
+//
+// ONE SLOT, like botw.input: the last Send replaces whatever was there.
+// Written by mods (any thread), read by the pad hooks (the input thread), so
+// it is published under a sequence count - odd while a write is in progress -
+// and the reader copies it whole or not at all. A torn read would be the new
+// buttons with the old frame count.
+struct Injection {
+    uint32_t buttons;
+    uint32_t setLeft;  float lx, ly;
+    uint32_t setRight; float rx, ry;
+    uint32_t until;    // presented-frame count it lapses at; 0 = released
+    uint32_t gen;      // bumped on every Send, so each pad notices a new one
+};
+inline Injection g_Inj{};
+inline volatile uint32_t g_InjSeq = 0;
+inline uint32_t g_InjGen = 0;
+
+// A dead man's switch, as botw.input has: an "indefinite" hold lapses this many
+// frames after the last Send unless it is sent again, so injected input can
+// never outlive whatever was driving it. About 5 seconds at 60 fps.
+constexpr uint32_t kMaxInjectionFrames = 300;
+constexpr uint32_t kHoldForever = 0xFFFFFFFFu;
+
+inline void PublishInjection(const Injection& in) {
+    __atomic_fetch_add(&g_InjSeq, 1u, __ATOMIC_ACQ_REL);   // odd: writing
+    Injection copy = in;
+    copy.gen = ++g_InjGen;
+    g_Inj = copy;
+    __atomic_fetch_add(&g_InjSeq, 1u, __ATOMIC_RELEASE);   // even: done
+}
+
+// A consistent copy of the slot, or false if a write kept getting in the way
+// (then this poll goes without injection - the next one picks it up).
+inline bool ReadInjection(Injection& out) {
+    for (int tries = 0; tries < 4; ++tries) {
+        const uint32_t a = __atomic_load_n(&g_InjSeq, __ATOMIC_ACQUIRE);
+        if (a & 1u) continue;
+        out = g_Inj;
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        if (__atomic_load_n(&g_InjSeq, __ATOMIC_RELAXED) == a) return true;
+    }
+    return false;
+}
+
+inline int32_t AxisToRaw(float v) {
+    if (v > 1.f) v = 1.f;
+    if (v < -1.f) v = -1.f;
+    return static_cast<int32_t>(v * 32767.0f);
+}
+
+// nn::hid's stick-tilt bits for one stick (Left/Up/Right/Down, in that bit
+// order), recomputed from an injected value so they agree with it. The 0.5
+// threshold is this module's, not a measured nn::hid constant.
+inline uint64_t TiltBits(float x, float y, int firstBit) {
+    uint64_t b = 0;
+    if (x < -0.5f) b |= 1ull << (firstBit + 0);
+    if (y >  0.5f) b |= 1ull << (firstBit + 1);
+    if (x >  0.5f) b |= 1ull << (firstBit + 2);
+    if (y < -0.5f) b |= 1ull << (firstBit + 3);
+    return b;
+}
+
+// Applies the injection to the samples the game is about to read - but only to
+// samples taken since the injection began. The game keeps a 16-sample history
+// and a press is a CHANGE across it; OR-ing the button into all 16 would hand
+// the game a button that was always down, with no edge to react to. Starting
+// from the sample current when this pad first saw the injection makes the
+// history show a real press, and the release is equally real when it lapses.
+inline void Inject(Pad* pad, NpadState* s, int count) {
+    Injection in;
+    if (!ReadInjection(in) || in.until == 0 || Present::FrameCount() >= in.until) return;
+
+    if (pad->injGen != in.gen) {
+        pad->injGen = in.gen;
+        pad->injStart = s[0].samplingNumber;
+    }
+    for (int i = 0; i < count; ++i) {
+        if (s[i].samplingNumber < pad->injStart) continue;
+        s[i].buttons |= in.buttons;
+        if (in.setLeft) {
+            s[i].lx = AxisToRaw(in.lx);
+            s[i].ly = AxisToRaw(in.ly);
+            s[i].buttons = (s[i].buttons & ~(0xFull << 16)) | TiltBits(in.lx, in.ly, 16);
+        }
+        if (in.setRight) {
+            s[i].rx = AxisToRaw(in.rx);
+            s[i].ry = AxisToRaw(in.ry);
+            s[i].buttons = (s[i].buttons & ~(0xFull << 20)) | TiltBits(in.rx, in.ry, 20);
+        }
+    }
+}
 
 // Capture. kForever is the latched form; otherwise "captured while the frame
 // count is below this".
@@ -147,6 +245,10 @@ inline void Process(void* array, int count, uint32_t id, const char* style) {
             s[i].lx = s[i].ly = s[i].rx = s[i].ry = 0;
         }
     }
+
+    // After capture, so a mod that has hidden the player's input can still
+    // drive the game itself. The pad's own readings above stay the player's.
+    if (connected) Inject(pad, s, count);
 }
 
 #if WIIXL_SWITCH
@@ -252,5 +354,57 @@ inline bool HoldInputCapture(uint32_t frames) {
 inline void SetInputCapture(bool on) { impl::g_CaptureUntil = on ? impl::kForever : 0; }
 
 inline bool IsInputCaptured() { return impl::Captured(); }
+
+// ---- injection ------------------------------------------------------------
+//
+// Buttons are OR'd onto the player's own; a stick is replaced only when its
+// set flag is on, because centring a stick and leaving it alone are different
+// instructions. `frames` counts presented frames; kHoldForever means "until
+// Release", which the dead man's switch still ends 300 frames after the last
+// Send. False when there is no live frame clock to count with.
+constexpr uint32_t kHoldForever = impl::kHoldForever;
+
+struct SendArgs {
+    uint32_t buttons = 0;
+    bool  setLeft = false;  float lx = 0.f, ly = 0.f;
+    bool  setRight = false; float rx = 0.f, ry = 0.f;
+    uint32_t frames = 1;
+};
+
+inline bool Send(const SendArgs& s) {
+    if (!Present::IsLive()) return false;
+    impl::Injection in{};
+    in.buttons = s.buttons;
+    in.setLeft = s.setLeft ? 1u : 0u;  in.lx = s.lx; in.ly = s.ly;
+    in.setRight = s.setRight ? 1u : 0u; in.rx = s.rx; in.ry = s.ry;
+    const uint32_t frames = s.frames == 0 ? 1u
+                          : s.frames == kHoldForever ? impl::kMaxInjectionFrames
+                          : s.frames;
+    in.until = Present::FrameCount() + frames;
+    impl::PublishInjection(in);
+    return true;
+}
+
+inline bool Hold(uint32_t buttonMask, uint32_t frames) {
+    SendArgs s;
+    s.buttons = buttonMask;
+    s.frames = frames;
+    return Send(s);
+}
+
+// Ends injection now. The next poll applies nothing, so the game's sample
+// history shows the release as a real edge.
+inline void Release() { impl::PublishInjection(impl::Injection{}); }
+
+inline bool IsInjecting() {
+    impl::Injection in;
+    return impl::ReadInjection(in) && in.until != 0 && Present::FrameCount() < in.until;
+}
+
+inline uint32_t InjectedButtons() {
+    impl::Injection in;
+    if (!impl::ReadInjection(in) || in.until == 0 || Present::FrameCount() >= in.until) return 0;
+    return in.buttons;
+}
 
 } // namespace WiiXLaunch::TotK::Input
