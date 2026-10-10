@@ -8,3 +8,4 @@
 #include <wiixlaunch/totk/game/player.hpp>
 #include <wiixlaunch/totk/game/gamedata.hpp>
 #include <wiixlaunch/totk/game/world.hpp>
+#include <wiixlaunch/totk/game/camera.hpp>

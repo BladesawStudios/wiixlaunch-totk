@@ -16,7 +16,8 @@
 // Only some of the module needs this. The frame source (graphics/present.hpp)
 // and input (game/input.hpp) go through sdk exports and need no address in
 // main on any build; the player (game/player.hpp), GameData
-// (game/gamedata.hpp) and world (game/world.hpp) layers do. Fields join Row as features need them, with the 1.2.1 value
+// (game/gamedata.hpp), world (game/world.hpp) and camera (game/camera.hpp)
+// layers do. Fields join Row as features need them, with the 1.2.1 value
 // first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
@@ -98,12 +99,25 @@ struct WorldLayout {
     uint64_t weatherForced;  // the flag setWeather(force) ORs in (0x200000000)
 };
 
+// Camera layer (game/camera.hpp): the active sead::LookAtCamera.
+struct CameraLayout {
+    uint32_t moduleCell;     // GOT cell holding &engine::camera::CameraModule::sInstance (GetCameraForwardDir)
+    Func doUpdateMatrix;     // sead::LookAtCamera::doUpdateMatrix(cam, Matrix34f* out) - builds the view matrix
+    uint32_t moduleEntity0;  // CameraModule -> CameraEntity* of camera 0 (getCameraEntity: +0x238 + i*0x20)
+    uint32_t entityCamera;   // CameraEntity -> the active sead::Camera (GetCameraForwardDir: +8)
+    uint32_t camMatrix;      // sead::Camera -> Matrix34f view matrix (getWorldPosByMatrix: +8)
+    uint32_t camUp;          // LookAtCamera -> float[3] up (setUp: +0x50)
+    uint32_t camPos;         // LookAtCamera -> double[3] position (doUpdateMatrix: +0x60)
+    uint32_t camAt;          // LookAtCamera -> double[3] look-at (doUpdateMatrix: +0x78)
+};
+
 struct Row {
     uint32_t       fingerprint;   // GameVersion::Fingerprint() for this executable
     const char*    name;          // for the log only, never for matching
     PlayerLayout   player;
     GameDataLayout gamedata;
     WorldLayout    world;
+    CameraLayout   camera;
 };
 
 inline constexpr Row kRows[] = {
@@ -134,6 +148,11 @@ inline constexpr Row kRows[] = {
         { 0x01e0d604, 0xA9BD7BFDu },   // setWeather: stp x29,x30,[sp,#-0x30]!
         0x98, 0x28, 0x2c, 0xd0, 0x180,
         0x20, 0x2380, 0x940, 0xd20, 0x200000000ull,
+      },
+      {
+        0x0462ed90,
+        { 0x00a2e4b0, 0xD10103FFu },   // LookAtCamera::doUpdateMatrix: sub sp,sp,#0x40
+        0x238, 0x8, 0x8, 0x50, 0x60, 0x78,
       } },
 };
 

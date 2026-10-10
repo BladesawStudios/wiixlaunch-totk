@@ -38,6 +38,8 @@ inline void Register() {
     WiiXLaunch::TotK::GameData::Init();
     // The world layer: hooks the world manager's own per-frame update.
     WiiXLaunch::TotK::World::Init();
+    // The camera layer: hooks LookAtCamera::doUpdateMatrix.
+    WiiXLaunch::TotK::Camera::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

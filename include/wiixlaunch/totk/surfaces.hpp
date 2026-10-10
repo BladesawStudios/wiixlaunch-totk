@@ -8,6 +8,7 @@
 #include <wiixlaunch/totk/surfaces/player_surface.hpp>
 #include <wiixlaunch/totk/surfaces/gamedata_surface.hpp>
 #include <wiixlaunch/totk/surfaces/world_surface.hpp>
+#include <wiixlaunch/totk/surfaces/camera_surface.hpp>
 
 namespace WiiXLaunch::TotK::Surfaces {
 
@@ -17,6 +18,7 @@ inline void Register() {
     PlayerSurface::Register();
     GameDataSurface::Register();
     WorldSurface::Register();
+    CameraSurface::Register();
 }
 
 } // namespace WiiXLaunch::TotK::Surfaces
