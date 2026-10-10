@@ -1,0 +1,6 @@
+#pragma once
+
+// Umbrella include for wiixlaunch-totk.
+
+#include <wiixlaunch/totk/build.hpp>
+#include <wiixlaunch/totk/graphics/present.hpp>
