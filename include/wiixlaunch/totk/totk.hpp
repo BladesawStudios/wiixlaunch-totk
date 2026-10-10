@@ -6,3 +6,4 @@
 #include <wiixlaunch/totk/graphics/present.hpp>
 #include <wiixlaunch/totk/game/input.hpp>
 #include <wiixlaunch/totk/game/player.hpp>
+#include <wiixlaunch/totk/game/gamedata.hpp>

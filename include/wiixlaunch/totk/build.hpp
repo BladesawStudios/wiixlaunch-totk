@@ -15,8 +15,8 @@
 //
 // Only some of the module needs this. The frame source (graphics/present.hpp)
 // and input (game/input.hpp) go through sdk exports and need no address in
-// main on any build; the player layer (game/player.hpp) is the first thing
-// that does. Fields join Row as features need them, with the 1.2.1 value
+// main on any build; the player layer (game/player.hpp) and the GameData
+// layer (game/gamedata.hpp) do. Fields join Row as features need them, with the 1.2.1 value
 // first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
@@ -64,10 +64,25 @@ struct PlayerLayout {
     uint32_t staminaExtra;     // StaminaCalculator -> float, yellow stamina (calcRecovery: 0x78)
 };
 
+// GameData layer (game/gamedata.hpp): gmd::GameDataMgr's typed accessors.
+// Every getter is (mgr, T* out, u32 hash) -> bool, false for an unknown hash;
+// every setter is (mgr, T value, u32 hash), Vector3 by pointer. Setters QUEUE
+// the write in the manager's own atomic ring - the game applies it later.
+struct GameDataLayout {
+    uint32_t mgrCell;    // GOT cell holding &GameDataMgr::sInstance (getMaxStamina: adrp/ldr 0x3d8)
+    Func getBool, setBool;
+    Func getInt, setInt;
+    Func getUInt, setUInt;
+    Func getFloat, setFloat;
+    Func getVec3, setVec3;   // getVector3, setVector3f
+    Func getEnum, setEnum;   // an enum value is the murmur3 hash of its name
+};
+
 struct Row {
-    uint32_t     fingerprint;   // GameVersion::Fingerprint() for this executable
-    const char*  name;          // for the log only, never for matching
-    PlayerLayout player;
+    uint32_t       fingerprint;   // GameVersion::Fingerprint() for this executable
+    const char*    name;          // for the log only, never for matching
+    PlayerLayout   player;
+    GameDataLayout gamedata;
 };
 
 inline constexpr Row kRows[] = {
@@ -81,6 +96,15 @@ inline constexpr Row kRows[] = {
         { 0x006836b0, 0xF94C1808u },   // ldr x8,[x0,#0x1830]
         { 0x01623d88, 0xD10083FFu },   // sub sp,sp,#0x20
         0x18, 0x2b4, 0x2c8, 0x2e0, 0x228, 0x2f8, 0x1830, 0x1838, 0x1388, 0x74, 0x78,
+      },
+      {
+        0x0462e3d8,
+        { 0x00d45810, 0xA9BD7BFDu }, { 0x00b20a48, 0xA9BF7BFDu },   // getBool, setBool
+        { 0x010cd5bc, 0xA9BD7BFDu }, { 0x00b51b08, 0xA9BF7BFDu },   // getInt, setInt
+        { 0x01068290, 0x34000262u }, { 0x0110a95c, 0xA9BF7BFDu },   // getUInt, setUInt
+        { 0x00d7d620, 0x34000262u }, { 0x00b964fc, 0xA9BF7BFDu },   // getFloat, setFloat
+        { 0x010bcac0, 0x34000262u }, { 0x00decdec, 0xD10083FFu },   // getVector3, setVector3f
+        { 0x00d4447c, 0x34000262u }, { 0x00d451b0, 0xA9BF7BFDu },   // getEnum, setEnum
       } },
 };
 

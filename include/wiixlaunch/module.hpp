@@ -34,6 +34,8 @@ inline void Register() {
     // The player layer - the first that needs addresses in main, so it is
     // also the first that can be refused on a build with no row.
     WiiXLaunch::TotK::Player::Init();
+    // GameData: no hooks, only the game's own accessors, checked.
+    WiiXLaunch::TotK::GameData::Init();
 }
 
 } // namespace WiiXLaunch::GameModule
