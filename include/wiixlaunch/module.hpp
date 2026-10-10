@@ -28,6 +28,9 @@ inline void Register() {
     // must be in place before the game's NVN setup, and a host should have a
     // tick whether or not any mod imports totk.frame.
     WiiXLaunch::TotK::Present::Init();
+    // The pad hooks, for the same reason: installed whether or not a mod
+    // imports totk.input, so the boot log says whether the pad is visible.
+    WiiXLaunch::TotK::Input::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

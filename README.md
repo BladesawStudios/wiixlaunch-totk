@@ -34,12 +34,15 @@ names neither, with both present, is a build error rather than a coin flip.
 | `totk/build.hpp` | The per-build address table, keyed by the host's build fingerprint. One row (1.2.1), no fields yet |
 | `totk/graphics/present.hpp` | The frame source: `nvnBootstrapLoader` -> `nvnDeviceGetProcAddress` -> `nvnQueuePresentTexture`, which runs `Tick::RunAll` once per presented frame |
 | `totk/surfaces/frame_surface.hpp` | `totk.frame` v1.0: `FrameCount`, `IsLive` |
+| `totk/game/input.hpp` | Pad reads and input capture, from hooks on the sdk's five `nn::hid::GetNpadStates` overloads (by symbol, no addresses) |
+| `totk/surfaces/input_surface.hpp` | `totk.input` v1.0 |
 
 ### Surfaces
 
 | Surface | Version | Symbols |
 | --- | --- | --- |
 | `totk.frame` | 1.0 | `FrameCount() -> u32`, `IsLive() -> u32` |
+| `totk.input` | 1.0 | `IsLive`, `HeldButtons`, `MaskFor`, `IsPressed`, `GetLeftStick`, `GetRightStick`, `HoldInputCapture`, `SetInputCapture`, `IsInputCaptured` - the read calls match `botw.input`'s names, signatures and button indices; injection is planned for 1.1 |
 
 ## Builds
 
