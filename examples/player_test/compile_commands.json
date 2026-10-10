@@ -1,0 +1,28 @@
+[
+  {
+    "directory": "E:/Nintendo Stuff/BOTW/Mods/My Mods/WiiXLaunch/vendor/wiixlaunch-totk/examples/player_test",
+    "file": "E:/Nintendo Stuff/BOTW/Mods/My Mods/WiiXLaunch/vendor/wiixlaunch-totk/examples/player_test/mod.cpp",
+    "arguments": [
+      "C:\\devkitPro\\devkitA64\\bin\\aarch64-none-elf-g++.exe",
+      "-std=gnu++20",
+      "-fno-pie",
+      "-fno-pic",
+      "-Os",
+      "-ffreestanding",
+      "-fno-exceptions",
+      "-fno-rtti",
+      "-Wall",
+      "-Wextra",
+      "-Wduplicated-cond",
+      "-Wduplicated-branches",
+      "-Wno-unused-parameter",
+      "-Wno-unused-function",
+      "-mcmodel=small",
+      "-D__SWITCH__=1",
+      "-DWIIXL_SWITCH=1",
+      "-I",
+      "E:\\Nintendo Stuff\\BOTW\\Mods\\My Mods\\WiiXLaunch\\include",
+      "E:\\Nintendo Stuff\\BOTW\\Mods\\My Mods\\WiiXLaunch\\vendor\\wiixlaunch-totk\\examples\\player_test\\mod.cpp"
+    ]
+  }
+]

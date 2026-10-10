@@ -31,6 +31,9 @@ inline void Register() {
     // The pad hooks, for the same reason: installed whether or not a mod
     // imports totk.input, so the boot log says whether the pad is visible.
     WiiXLaunch::TotK::Input::Init();
+    // The player layer - the first that needs addresses in main, so it is
+    // also the first that can be refused on a build with no row.
+    WiiXLaunch::TotK::Player::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

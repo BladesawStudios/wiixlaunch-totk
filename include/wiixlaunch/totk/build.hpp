@@ -13,11 +13,11 @@
 // than hardcoding 1.2.1: an unenrolled build is a refused feature, not a hook
 // at an address that means something else in that executable.
 //
-// THE ROWS ARE EMPTY FOR NOW, deliberately. The one thing this module does so
-// far - the frame source in graphics/present.hpp - goes through
-// nvnBootstrapLoader, an sdk export, and needs no address in main on any
-// build. Fields join Row when the first surface needs one, with the 1.2.1
-// value first and other builds as rows are derived from their dumps.
+// Only some of the module needs this. The frame source (graphics/present.hpp)
+// and input (game/input.hpp) go through sdk exports and need no address in
+// main on any build; the player layer (game/player.hpp) is the first thing
+// that does. Fields join Row as features need them, with the 1.2.1 value
+// first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
 // fingerprint, and only 1.2.1's is corroborated by a real boot (see the
@@ -33,16 +33,55 @@
 
 namespace WiiXLaunch::TotK::Build {
 
+// A function in main: where it is, and the first instruction word expected
+// there. The word is checked before anything hooks or calls the function, so
+// a wrong row is refused at the function rather than trusted - the
+// fingerprint says which executable this is, the word says this row is right
+// about it.
+struct Func {
+    uint32_t offset;   // from main's base
+    uint32_t insn;     // little-endian first instruction
+};
+
+// Player layer (game/player.hpp). Every value derived from the 1.2.1
+// decompile; the comment on each says where.
+struct PlayerLayout {
+    Func calc;           // game::component::Player::calc(this, const float* dt)
+    Func preFinalize;    // game::component::Player::preFinalize(this)
+    Func addLife;        // game::component::Life::addLife(this, int)
+    Func getMaxStamina;  // game::player::StaminaCalculator::getMaxStamina(this) -> float
+
+    uint32_t playerActor;      // Player -> owning GameActor (calcPos: *(this+0x18))
+    uint32_t actorPos;         // GameActor -> Vec3f position (calcPos: 0x2b4/0x2b8/0x2bc)
+    uint32_t actorForwardX;    // GameActor rotation, forward axis x (calcPos: 0x2c8)
+    uint32_t actorForwardZ;    //                     forward axis z (calcPos: 0x2e0)
+    uint32_t actorComponents;  // GameActor -> component table (updateLifeFlags: 0x228)
+    uint32_t componentsLife;   // table -> Life component (updateLifeFlags: 0x2f8)
+    uint32_t lifeCurrent;      // Life -> value holder, int at +8 (addLife: 0x1830)
+    uint32_t lifeMax;          // Life -> value holder, int at +8 (addLife: 0x1838)
+    uint32_t playerStamina;    // Player -> StaminaCalculator (updateStaminaByPerFrameRate: +5000)
+    uint32_t staminaCurrent;   // StaminaCalculator -> float, clamped to max (calcRecovery: 0x74)
+    uint32_t staminaExtra;     // StaminaCalculator -> float, yellow stamina (calcRecovery: 0x78)
+};
+
 struct Row {
-    uint32_t    fingerprint;   // GameVersion::Fingerprint() for this executable
-    const char* name;          // for the log only, never for matching
-    // Per-build addresses go here, as offsets from main's base.
+    uint32_t     fingerprint;   // GameVersion::Fingerprint() for this executable
+    const char*  name;          // for the log only, never for matching
+    PlayerLayout player;
 };
 
 inline constexpr Row kRows[] = {
     // build_id 9B4E43650501A4D4489B4BBFDB740F26AF3CF850 - the one Ryujinx
-    // reported for the session it called v1.2.1.
-    { 0x181D91D8u, "1.2.1" },
+    // reported for the session it called v1.2.1, and the one in the dump the
+    // decompile below was made from (checked: same 20 bytes at NSO +0x40).
+    { 0x181D91D8u, "1.2.1",
+      {
+        { 0x006515cc, 0xA9BE7BFDu },   // stp x29,x30,[sp,#-0x20]!
+        { 0x0161eb80, 0xD100C3FFu },   // sub sp,sp,#0x30
+        { 0x006836b0, 0xF94C1808u },   // ldr x8,[x0,#0x1830]
+        { 0x01623d88, 0xD10083FFu },   // sub sp,sp,#0x20
+        0x18, 0x2b4, 0x2c8, 0x2e0, 0x228, 0x2f8, 0x1830, 0x1838, 0x1388, 0x74, 0x78,
+      } },
 };
 
 inline constexpr uint32_t kRowCount = sizeof(kRows) / sizeof(kRows[0]);

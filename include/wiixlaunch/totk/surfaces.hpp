@@ -5,12 +5,14 @@
 
 #include <wiixlaunch/totk/surfaces/frame_surface.hpp>
 #include <wiixlaunch/totk/surfaces/input_surface.hpp>
+#include <wiixlaunch/totk/surfaces/player_surface.hpp>
 
 namespace WiiXLaunch::TotK::Surfaces {
 
 inline void Register() {
     FrameSurface::Register();
     InputSurface::Register();
+    PlayerSurface::Register();
 }
 
 } // namespace WiiXLaunch::TotK::Surfaces
