@@ -1,0 +1,25 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "WiiXLaunch mod",
+      "compilerPath": "C:/devkitPro/devkitA64/bin/aarch64-none-elf-g++.exe",
+      "compilerArgs": [
+        "-ffreestanding",
+        "-fno-exceptions",
+        "-fno-rtti"
+      ],
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "gcc-x64",
+      "includePath": [
+        "E:/Nintendo Stuff/BOTW/Mods/My Mods/WiiXLaunch/sdk/include",
+        "${workspaceFolder}"
+      ],
+      "defines": [
+        "__CEMU__=1",
+        "WIIXL_CEMU=1"
+      ]
+    }
+  ]
+}
