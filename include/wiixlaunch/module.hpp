@@ -40,6 +40,9 @@ inline void Register() {
     WiiXLaunch::TotK::World::Init();
     // The camera layer: hooks LookAtCamera::doUpdateMatrix.
     WiiXLaunch::TotK::Camera::Init();
+    // The actor layer: hooks BaseProcMgr::processLists, the manager's own
+    // serial per-frame step - never an actor's update, which runs in parallel.
+    WiiXLaunch::TotK::Actor::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

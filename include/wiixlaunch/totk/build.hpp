@@ -16,8 +16,8 @@
 // Only some of the module needs this. The frame source (graphics/present.hpp)
 // and input (game/input.hpp) go through sdk exports and need no address in
 // main on any build; the player (game/player.hpp), GameData
-// (game/gamedata.hpp), world (game/world.hpp) and camera (game/camera.hpp)
-// layers do. Fields join Row as features need them, with the 1.2.1 value
+// (game/gamedata.hpp), world (game/world.hpp), camera (game/camera.hpp) and
+// actor (game/actor.hpp) layers do. Fields join Row as features need them, with the 1.2.1 value
 // first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
@@ -111,6 +111,28 @@ struct CameraLayout {
     uint32_t camAt;          // LookAtCamera -> double[3] look-at (doUpdateMatrix: +0x78)
 };
 
+// Actor layer (game/actor.hpp): walking live procs, spawning, deleting, moving.
+struct ActorLayout {
+    uint32_t procMgrCell;     // GOT cell -> &shaft::baseproc::BaseProcMgr::sInstance
+    uint32_t procTree;        // BaseProcMgr -> tree root (deleteAllActors: *(mgr+0x38)); mutex at mgr+0
+    uint32_t nodeContainer;   // tree node -> container is node - this (deleteAll callback: -8)
+    uint32_t containerProc;   // container -> BaseProc* (+0x28)
+    uint32_t containerNext;   // container -> next container, same key (+0x38)
+    uint32_t procState;       // BaseProc -> s32 state (+0x24; 7..11 = being deleted)
+    uint32_t procNameStr;     // BaseProc -> const char* name. The ctor copies a {const char*, u32 len}
+                              //   view to +0x18/+0x20 (getName returns +0x18). NOT +0x20 - that read
+                              //   len|state as a pointer, 0x0000000400000000, and crashed every boot.
+    uint32_t actorMgrCell;    // GOT cell -> &engine::actor::ActorMgr::sInstance
+    uint32_t actorPos;        // GameActor -> Vec3f position (+0x2b4, as the player layer)
+    uint32_t actorRot;        // GameActor -> Matrix33f rotation, row-major (+0x2c0)
+    Func dynamicCast;         // sead::DynamicCast<GameActor, BaseProc>(proc) -> GameActor* or null
+    Func requestCreate;       // ActorMgr::requestCreateActorAsync(mgr, const char** name, arg, handle, ...)
+    Func requestDelete;       // BaseProc::requestDelete(proc, u32 reason) - thread-safe
+    Func setTransform;        // ActorBase::setTransform(actor, const Matrix34f*) - physics-aware
+    Func processLists;        // BaseProcMgr::processLists(mgr) - the per-frame serial step that
+                              //   runs processRemovals + processRequests; the tree is settled after it
+};
+
 struct Row {
     uint32_t       fingerprint;   // GameVersion::Fingerprint() for this executable
     const char*    name;          // for the log only, never for matching
@@ -118,6 +140,7 @@ struct Row {
     GameDataLayout gamedata;
     WorldLayout    world;
     CameraLayout   camera;
+    ActorLayout    actor;
 };
 
 inline constexpr Row kRows[] = {
@@ -153,6 +176,15 @@ inline constexpr Row kRows[] = {
         0x0462ed90,
         { 0x00a2e4b0, 0xD10103FFu },   // LookAtCamera::doUpdateMatrix: sub sp,sp,#0x40
         0x238, 0x8, 0x8, 0x50, 0x60, 0x78,
+      },
+      {
+        0x0462ded8, 0x38, 0x8, 0x28, 0x38, 0x24, 0x18,
+        0x0462e3f8, 0x2b4, 0x2c0,
+        { 0x00b7ee80, 0xD10083FFu },   // DynamicCast<GameActor, BaseProc>: sub sp,sp,#0x20
+        { 0x00ab92cc, 0xA9BA7BFDu },   // requestCreateActorAsync: stp x29,x30,[sp,#-0x60]!
+        { 0x0083aa68, 0xD10143FFu },   // BaseProc::requestDelete: sub sp,sp,#0x50
+        { 0x014d5880, 0xD100C3FFu },   // ActorBase::setTransform: sub sp,sp,#0x30
+        { 0x008ed56c, 0xA9BE7BFDu },   // BaseProcMgr::processLists: stp x29,x30,[sp,#-0x20]!
       } },
 };
 

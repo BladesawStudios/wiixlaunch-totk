@@ -9,3 +9,4 @@
 #include <wiixlaunch/totk/game/gamedata.hpp>
 #include <wiixlaunch/totk/game/world.hpp>
 #include <wiixlaunch/totk/game/camera.hpp>
+#include <wiixlaunch/totk/game/actor.hpp>

@@ -256,6 +256,7 @@ inline void Init() {
 // Whether the layer is installed at all - false on an unenrolled build.
 inline bool Supported() { return impl::g_Ready; }
 
+
 inline bool IsPresent() { return impl::g_Snap.present != 0; }
 inline uint32_t UpdateCount() { return impl::g_Snap.updates; }
 
