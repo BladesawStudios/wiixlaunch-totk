@@ -16,8 +16,8 @@
 // Only some of the module needs this. The frame source (graphics/present.hpp)
 // and input (game/input.hpp) go through sdk exports and need no address in
 // main on any build; the player (game/player.hpp), GameData
-// (game/gamedata.hpp), world (game/world.hpp), camera (game/camera.hpp) and
-// actor (game/actor.hpp) layers do. Fields join Row as features need them, with the 1.2.1 value
+// (game/gamedata.hpp), world (game/world.hpp), camera (game/camera.hpp),
+// actor (game/actor.hpp) and display (graphics/display.hpp) layers do. Fields join Row as features need them, with the 1.2.1 value
 // first and other builds as rows are derived from their dumps.
 //
 // Keyed by FINGERPRINT, not name: the name is a label totk.json gives a
@@ -133,6 +133,45 @@ struct ActorLayout {
                               //   runs processRemovals + processRequests; the tree is settled after it
 };
 
+// Display layer (graphics/display.hpp): frame pacing and render scale.
+struct DisplayLayout {
+    Func presentUpdate;          // engine::framework::PresentationInfo::update(info, framework) -
+                                 //   once a frame from Framework::procFrame_
+    uint32_t presMin;            // PresentationInfo -> s32 fastest interval it may pick (+0x0)
+    uint32_t presMax;            // PresentationInfo -> s32 slowest interval it may pick (+0x4)
+    uint32_t presStepDown;       // PresentationInfo -> s32 interval it steps back down to (+0x18)
+    uint32_t presInterval;       // PresentationInfo -> s32 current present interval (+0x14)
+    uint32_t presLock;           // PresentationInfo -> u8 "use the interval as is" (+0x24)
+    uint32_t fwFrameTicks;       // Framework -> s64 last frame's duration in system ticks (+0x118)
+    Func calcDynamicResolution;  // game::gfx::ResolutionMgr::calcDynamicResolution(mgr, info) ->
+                                 //   u64: low 32 = float scale, bits 32..39 = 0 apply/1 reset/2 same
+    uint32_t resFlags;           // ResolutionMgr -> u32 flags, bit 0 = dynamic resolution on (+0x118)
+    Func updateResolution;       // game::gfx::ModelSceneExtension::updateResolution(mse, mode) - at
+                                 //   start and on every docked/handheld switch
+    uint32_t mseFinalW;          // ModelSceneExtension -> float final-image (= render target) width (+0xcc0)
+    uint32_t mseBaseW;           // ModelSceneExtension -> float base render width at scale 1.0 (+0xcc4)
+    uint32_t mseBaseH;           // ModelSceneExtension -> float base render height (+0xcc8)
+    Func getHeapSize;            // engine::util::HeapSizeDB::getHeapSize(db, const char** name) ->
+                                 //   {s64 bytes; bool found} through x8. EVERY heap size the game
+                                 //   reads from System/HeapSize/*.HeapDef.byml goes through it -
+                                 //   module heaps (ModuleSystem::initializeModules) and named
+                                 //   pools (engine::util::GetHeapSize) alike
+    Func initGraphics;           // sead::GameFrameworkNx::initializeGraphicsSystem(fw, heap, heap, arg) -
+                                 //   creates the display buffers; called by AppMain AFTER mod entries
+    uint32_t fwDisplayW;         // GameFrameworkNx -> u32 display buffer width (+0x9c; AppMain: 1920)
+    uint32_t fwDisplayH;         // GameFrameworkNx -> u32 display buffer height (+0xa0; AppMain: 1080)
+    Func getBaseResolution;      // game::gfx::ResolutionParam::getBaseResolution(p) -> const s32[2]*
+    Func getFinalResolution;     // game::gfx::ResolutionParam::getFinalImageResolution(p) -> const s32[2]*
+    // Variable frame rate: three INLINE hook sites. Each Func names the
+    // instruction the hook displaces, not a function entry.
+    Func vfrDeltaStore;          // engine::framework::VFRMgr::update: stp s0,s1,[x0,#8] - stores
+                                 //   deltaFrame (interval*0.5) and deltaSec (interval/60); every
+                                 //   delta the game hands out is scaled from these two
+    Func clothStep;              // cloth sim (FUN_7100821048): s0 was just loaded with a fixed
+                                 //   1/30 s step (main+0x3811eac) that is not scaled by the VFR
+    Func ultrahandStep;          // Ultrahand (FUN_7101d48210): s0 holds a per-30fps-frame amount
+};
+
 struct Row {
     uint32_t       fingerprint;   // GameVersion::Fingerprint() for this executable
     const char*    name;          // for the log only, never for matching
@@ -141,6 +180,7 @@ struct Row {
     WorldLayout    world;
     CameraLayout   camera;
     ActorLayout    actor;
+    DisplayLayout  display;
 };
 
 inline constexpr Row kRows[] = {
@@ -185,6 +225,22 @@ inline constexpr Row kRows[] = {
         { 0x0083aa68, 0xD10143FFu },   // BaseProc::requestDelete: sub sp,sp,#0x50
         { 0x014d5880, 0xD100C3FFu },   // ActorBase::setTransform: sub sp,sp,#0x30
         { 0x008ed56c, 0xA9BE7BFDu },   // BaseProcMgr::processLists: stp x29,x30,[sp,#-0x20]!
+      },
+      {
+        { 0x008f26c8, 0xD10183FFu },   // PresentationInfo::update: sub sp,sp,#0x60
+        0x0, 0x4, 0x18, 0x14, 0x24, 0x118,
+        { 0x00cc26f4, 0xD102C3FFu },   // ResolutionMgr::calcDynamicResolution: sub sp,sp,#0xb0
+        0x118,
+        { 0x00cc3f10, 0xD10143FFu },   // ModelSceneExtension::updateResolution: sub sp,sp,#0x50
+        0xcc0, 0xcc4, 0xcc8,
+        { 0x007f6a18, 0xD101C3FFu },   // HeapSizeDB::getHeapSize: sub sp,sp,#0x70
+        { 0x00e7e9fc, 0xD10303FFu },   // GameFrameworkNx::initializeGraphicsSystem: sub sp,sp,#0xc0
+        0x9c, 0xa0,
+        { 0x00cc410c, 0xA9BE7BFDu },   // ResolutionParam::getBaseResolution: stp x29,x30,[sp,#-0x20]!
+        { 0x00cc4160, 0xA9BE7BFDu },   // ResolutionParam::getFinalImageResolution: same prologue
+        { 0x007ede9c, 0x2D010400u },   // VFRMgr::update: stp s0,s1,[x0,#8]
+        { 0x00821924, 0x52A7F008u },   // cloth: mov w8,#0x3f800000 (after ldr s0, 1/30)
+        { 0x01d48d44, 0xAA1303E0u },   // Ultrahand: mov x0,x19 (after the per-frame amount in s0)
       } },
 };
 

@@ -43,6 +43,9 @@ inline void Register() {
     // The actor layer: hooks BaseProcMgr::processLists, the manager's own
     // serial per-frame step - never an actor's update, which runs in parallel.
     WiiXLaunch::TotK::Actor::Init();
+    // The display layer: hooks PresentationInfo::update and
+    // ResolutionMgr::calcDynamicResolution, and notes whether UltraCam is loaded.
+    WiiXLaunch::TotK::Display::Init();
 }
 
 } // namespace WiiXLaunch::GameModule

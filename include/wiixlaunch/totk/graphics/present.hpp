@@ -71,6 +71,13 @@ inline PresentFn   volatile g_OrigPresent   = nullptr;   // trampoline
 // Written on the render thread, read by mods through totk.frame.
 inline volatile uint32_t g_Frames = 0;
 
+// Wall-clock time between presents, averaged over kPeriodWindow of them: the
+// frame rate the player actually sees, whoever set it. 0 until one window has
+// passed. System ticks are 19.2 MHz.
+constexpr uint32_t kPeriodWindow = 30;
+inline uint64_t g_WindowStart = 0;
+inline volatile uint32_t g_PeriodUs = 0;
+
 inline bool g_BootstrapHooked = false;
 inline bool g_PresentHooked   = false;
 inline bool g_PresentRefused  = false;
@@ -81,6 +88,15 @@ inline void PresentHook(void* queue, void* window, int textureIndex) {
     if (n == 1) {
         WIIXL_LOG("totk: first frame presented - the tick source is live");
     }
+#if WIIXL_SWITCH
+    if (n % kPeriodWindow == 1) {
+        const uint64_t now = svcGetSystemTick();
+        if (n > 1) {
+            g_PeriodUs = static_cast<uint32_t>((now - g_WindowStart) * 10 / 192 / kPeriodWindow);
+        }
+        g_WindowStart = now;
+    }
+#endif
 
     // Before the original, so anything a tick queues lands in this frame
     // rather than the next.
@@ -193,5 +209,7 @@ inline bool Init() {
 
 inline uint32_t FrameCount() { return impl::g_Frames; }
 inline bool IsLive() { return impl::g_Frames != 0; }
+// Mean microseconds between the last kPeriodWindow presents; 0 = not yet.
+inline uint32_t PeriodUs() { return impl::g_PeriodUs; }
 
 } // namespace WiiXLaunch::TotK::Present

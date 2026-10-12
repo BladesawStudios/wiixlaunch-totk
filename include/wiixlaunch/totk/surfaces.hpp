@@ -10,6 +10,7 @@
 #include <wiixlaunch/totk/surfaces/world_surface.hpp>
 #include <wiixlaunch/totk/surfaces/camera_surface.hpp>
 #include <wiixlaunch/totk/surfaces/actor_surface.hpp>
+#include <wiixlaunch/totk/surfaces/display_surface.hpp>
 
 namespace WiiXLaunch::TotK::Surfaces {
 
@@ -21,6 +22,7 @@ inline void Register() {
     WorldSurface::Register();
     CameraSurface::Register();
     ActorSurface::Register();
+    DisplaySurface::Register();
 }
 
 } // namespace WiiXLaunch::TotK::Surfaces
